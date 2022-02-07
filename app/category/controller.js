@@ -1,7 +1,18 @@
 const Category = require('./model');
+const { policyFor } = require('../policy');
 
 async function store(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('create', 'Category')) {
+      // <-- can delete
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk menambah kategori`,
+      });
+    }
+
     const payload = req.body;
 
     const category = new Category(payload);
@@ -22,6 +33,16 @@ async function store(req, res, next) {
 
 async function update(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('update', 'Category')) {
+      // <-- can delete
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk mengubah kategori`,
+      });
+    }
+
     let payload = req.body;
     let category = await Category.findOneAndUpdate({ _id: req.params.id }, payload, { new: true, runValidators: true });
     return res.json(category);
@@ -39,6 +60,16 @@ async function update(req, res, next) {
 
 async function destroy(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('delete', 'Category')) {
+      // <-- can delete
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk menghapus kategori`,
+      });
+    }
+
     // (1) cari dan hapus categori di MongoDB berdasarkan field _id
     let deleted = await Category.findOneAndDelete({ _id: req.params.id });
 

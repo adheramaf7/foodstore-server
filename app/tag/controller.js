@@ -2,6 +2,16 @@ const Tag = require('./model');
 
 async function store(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('create', 'Tag')) {
+      // <-- can create Tag
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk membuat tag`,
+      });
+    }
+
     const payload = req.body;
 
     const tag = new Tag(payload);
@@ -22,6 +32,16 @@ async function store(req, res, next) {
 
 async function update(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('update', 'Tag')) {
+      // <-- can update Tag
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk mengupdate tag`,
+      });
+    }
+
     let payload = req.body;
     let tag = await Tag.findOneAndUpdate({ _id: req.params.id }, payload, { new: true, runValidators: true });
     return res.json(tag);
@@ -39,6 +59,16 @@ async function update(req, res, next) {
 
 async function destroy(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('delete', 'Tag')) {
+      // <-- can delete Tag
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk menghapus tag`,
+      });
+    }
+
     // (1) cari dan hapus categori di MongoDB berdasarkan field _id
     let deleted = await Tag.findOneAndDelete({ _id: req.params.id });
 

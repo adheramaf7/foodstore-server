@@ -4,6 +4,7 @@ const Tag = require('../tag/model');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
+const { policyFor } = require('../policy');
 
 async function index(req, res, next) {
   try {
@@ -30,8 +31,9 @@ async function index(req, res, next) {
       criteria = { ...criteria, tags: { $in: tags.map((tag) => tag._id) } };
     }
 
-    const products = await Product.find(criteria).populate('category').populate('tags').limit(parseInt(limit)).skip(parseInt(skip));
-    return res.json(products);
+    const products = await Product.find(criteria).paginate(parseInt(limit), parseInt(skip)).populate('category').populate('tags');
+    const count = await Product.find().countDocuments();
+    return res.json({ data: products, count });
   } catch (err) {
     next(err);
   }
@@ -39,6 +41,14 @@ async function index(req, res, next) {
 
 async function store(req, res, next) {
   try {
+    let policy = policyFor(req.user);
+    if (!policy.can('create', 'Product')) {
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk membuat produk`,
+      });
+    }
+
     let payload = req.body;
 
     if (payload.category) {
@@ -121,6 +131,15 @@ async function store(req, res, next) {
 
 async function update(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('update', 'Product')) {
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk mengupdate produk`,
+      });
+    }
+
     let payload = req.body;
 
     if (payload.category) {
@@ -137,7 +156,6 @@ async function update(req, res, next) {
 
       // (1) cek apakah tags membuahkan hasil
       if (tags.length) {
-        console.log(tags);
         // (2) jika ada, maka kita ambil `_id` untuk masing-masing `Tag` dan gabungkan dengan payload
         payload = { ...payload, tags: tags.map((tag) => tag._id) };
       }
@@ -217,6 +235,16 @@ async function update(req, res, next) {
 
 async function destroy(req, res, next) {
   try {
+    //--- cek policy ---/
+    let policy = policyFor(req.user);
+    if (!policy.can('delete', 'Product')) {
+      // <-- can delete
+      return res.json({
+        error: 1,
+        message: `Anda tidak memiliki akses untuk menghapus produk`,
+      });
+    }
+
     const product = await Product.findOneAndDelete({ _id: req.params.id });
 
     const currentImage = `${config.rootPath}/public/upload/${product.image_url}`;
