@@ -1,12 +1,36 @@
 const Product = require('./model');
+const Category = require('../category/model');
+const Tag = require('../tag/model');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 
 async function index(req, res, next) {
   try {
-    let { limit = 10, skip = 0 } = req.query;
-    const products = await Product.find().limit(parseInt(limit)).skip(parseInt(skip));
+    let { limit = 10, skip = 0, q = '', category = '', tags = [] } = req.query;
+    let criteria = {};
+
+    if (q.length) {
+      // --- gabungkan dengan criteria --- //
+      criteria = {
+        ...criteria,
+        name: { $regex: `${q}`, $options: 'i' },
+      };
+    }
+
+    if (category.length) {
+      category = await Category.findOne({ name: { $regex: `${category}` }, $options: 'i' });
+      if (category) {
+        criteria = { ...criteria, category: category._id };
+      }
+    }
+
+    if (tags.length) {
+      tags = await Tag.find({ name: { $in: tags } });
+      criteria = { ...criteria, tags: { $in: tags.map((tag) => tag._id) } };
+    }
+
+    const products = await Product.find(criteria).populate('category').populate('tags').limit(parseInt(limit)).skip(parseInt(skip));
     return res.json(products);
   } catch (err) {
     next(err);
@@ -15,7 +39,25 @@ async function index(req, res, next) {
 
 async function store(req, res, next) {
   try {
-    const payload = req.body;
+    let payload = req.body;
+
+    if (payload.category) {
+      let category = await Category.findOne({ name: { $regex: payload.category, $options: 'i' } });
+      if (category) {
+        payload = { ...payload, category: category._id };
+      } else {
+        delete payload.category;
+      }
+    }
+
+    if (payload.tags && payload.tags.length) {
+      let tags = await Tag.find({ name: { $in: payload.tags } });
+      // (1) cek apakah tags membuahkan hasil
+      if (tags.length) {
+        // (2) jika ada, maka kita ambil `_id` untuk masing-masing `Tag` dan gabungkan dengan payload
+        payload = { ...payload, tags: tags.map((tag) => tag._id) };
+      }
+    }
 
     if (req.file) {
       let tempPath = req.file.path;
@@ -79,7 +121,27 @@ async function store(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const payload = req.body;
+    let payload = req.body;
+
+    if (payload.category) {
+      let category = await Category.findOne({ name: { $regex: payload.category, $options: 'i' } });
+      if (category) {
+        payload = { ...payload, category: category._id };
+      } else {
+        delete payload.category;
+      }
+    }
+
+    if (payload.tags && payload.tags.length) {
+      let tags = await Tag.find({ name: { $in: payload.tags } });
+
+      // (1) cek apakah tags membuahkan hasil
+      if (tags.length) {
+        console.log(tags);
+        // (2) jika ada, maka kita ambil `_id` untuk masing-masing `Tag` dan gabungkan dengan payload
+        payload = { ...payload, tags: tags.map((tag) => tag._id) };
+      }
+    }
 
     if (req.file) {
       let tempPath = req.file.path;
@@ -137,7 +199,6 @@ async function update(req, res, next) {
       });
     } else {
       let product = await Product.findOneAndUpdate({ _id: req.params.id }, payload, { new: true, runValidators: true });
-      await product.save();
 
       return res.json(product);
     }
