@@ -72,4 +72,43 @@ async function update(req, res, next) {
   }
 }
 
-module.exports = { store };
+async function update(req, res, next) {
+  let policy = policyFor(req.user);
+
+  try {
+    // (1) dapatkan `id` dari `req.params`
+    let { id } = req.params;
+
+    // (2) buat `payload` dan keluarkan `_id`
+    let { _id, ...payload } = req.body;
+
+    let address = await DeliveryAddress.findOne({ _id: id });
+    let subjectAddress = subject('DeliveryAddress', { ...address, user_id: address.user });
+
+    if (!policy.can('update', subjectAddress)) {
+      return res.json({
+        error: 1,
+        message: `You're not allowed to modify this resource`,
+      });
+    }
+
+    // (1) update ke MongoDB
+    address = await DeliveryAddress.findOneAndUpdate({ _id: id }, payload, { new: true });
+
+    // (2) respon dengan data `address`
+    return res.json(address);
+  } catch (err) {
+    // (1) tangani kemungkinan _error_
+    if (err && err.name == 'ValidationError') {
+      return res.json({
+        error: 1,
+        message: err.message,
+        fields: err.errors,
+      });
+    }
+
+    next(err);
+  }
+}
+
+module.exports = { store, update };
