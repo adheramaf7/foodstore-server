@@ -1,5 +1,7 @@
 const CartItem = require('../cart-item/model');
 const Product = require('../product/model');
+const { policyFor } = require('../policy');
+
 
 async function index(req, res, next) {
   let policy = policyFor(req.user);
